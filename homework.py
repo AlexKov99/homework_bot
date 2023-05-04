@@ -8,9 +8,9 @@ from dotenv import load_dotenv
 
 import requests
 
-from exceptions import StatusError, APIStatusCodeError
+from exceptions import StatusError, APIStatusCodeError, SendMessageError
 
-import telegram
+from telegram import Bot, TelegramError
 
 
 load_dotenv()
@@ -37,6 +37,11 @@ logging.basicConfig(
     format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
 )
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(handler)
+
 
 def check_tokens() -> bool:
     """Проверяет наличие всех переменных окружения."""
@@ -45,23 +50,40 @@ def check_tokens() -> bool:
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
+    logging.info(f'Попытка отправки сообщения {message}')
     try:
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-    except telegram.error.TelegramError as error:
-        telegram.error(f'Не получилось отправить сообщение{error}')
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logging.debug('Сообщение успешно отправлено')
+        return True
+    except TelegramError as error:
+        logging.error(error)
+        return False
 
 
 def get_api_answer(timestamp):
     """Делает запрос к API и возвращает ответ."""
+    timestamp = timestamp or int(time.time())
     params = {'from_date': timestamp}
-    response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-
-    if response.status_code != HTTPStatus.OK:
-        raise APIStatusCodeError(
-            f'Сервис недоступен. headers = {HEADERS}, params={params}')
-
-    response = response.json()
-    return response
+    try:
+        homework_statuses = requests.get(
+            ENDPOINT,
+            headers=HEADERS,
+            params=params
+        )
+    except Exception as error:
+        message = f'Эндпоинт {ENDPOINT} недоступен: {error}'
+        logger.error(message)
+        raise APIStatusCodeError(message)
+    if homework_statuses.status_code != HTTPStatus.OK:
+        message = f'Код ответа API: {homework_statuses.status_code}'
+        logger.error(message)
+        raise APIStatusCodeError(message)
+    try:
+        return homework_statuses.json()
+    except Exception as error:
+        message = f'Ошибка преобразования в формат json: {error}'
+        logger.error(message)
+        raise APIStatusCodeError(message)
 
 
 def check_response(response):
@@ -122,7 +144,7 @@ def main():
         logging.critical(error_message)
         sys.exit(error_message)
 
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
     current_report = None
@@ -137,16 +159,17 @@ def main():
             current_report = send_message(bot, parse_status(homework))
 
             if current_report == prev_report:
-                logging.debug(
+                logger.debug(
                     'Нет обновлений статуса домашней работы'
                 )
-
+        except SendMessageError as error:
+            logger.error(error)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
-            logging.exception(message)
+            logger.error(message)
         else:
-            logging.info('функция main полностью сработала')
+            logger.info('функция main полностью сработала')
         finally:
             time.sleep(RETRY_PERIOD)
 
