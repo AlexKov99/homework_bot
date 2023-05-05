@@ -2,23 +2,50 @@ import logging
 import os
 import sys
 import time
+from logging.handlers import RotatingFileHandler
 from http import HTTPStatus
 
-from dotenv import load_dotenv
 
 import requests
+import telegram
+from dotenv import load_dotenv
 
-from exceptions import StatusError, APIStatusCodeError, SendMessageError
 
-from telegram import Bot, TelegramError
+from exceptions import (
+    APIStatusCodeError,
+    SendMessageError,
+    StatusError,
+)
 
 
 load_dotenv()
+PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 
-PRACTICUM_TOKEN = os.getenv('TOKEN_PRAKT')
-TELEGRAM_TOKEN = os.getenv('TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('MY_CHAD_ID')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(BASE_DIR, 'telegram_bot.log')
+
+
+logger = logging.getLogger(__name__)
+log_format = ('%(asctime)s - [%(levelname)s] - %(name)s - '
+              '(%(filename)s).%(funcName)s(%(lineno)d) - %(message)s')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format=log_format
+)
+
+
+file_handler = RotatingFileHandler(LOG_FILE, maxBytes=5000000, backupCount=5)
+stream_handler = logging.StreamHandler()
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
+
+
+logger.debug('Бот начинает свою работу!')
+
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -31,33 +58,23 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='program.log',
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(stream=sys.stdout)
-logger.addHandler(handler)
-
-
-def check_tokens() -> bool:
+def check_tokens():
     """Проверяет наличие всех переменных окружения."""
     return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
 def send_message(bot, message):
-    """Отправляет сообщение в Telegram чат."""
-    logging.info(f'Попытка отправки сообщения {message}')
+    """Функция для отправки сообщения в телеграмм."""
     try:
-        bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug('Сообщение успешно отправлено')
-        return True
-    except TelegramError as error:
-        logging.error(error)
-        return False
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+    except telegram.TelegramError:
+        logger.error('Ошибка при отправке сообщения в телеграмм')
+    else:
+        logger.debug(
+            f'Бот отправил сообщение \n'
+            f'пользователю с id: {TELEGRAM_CHAT_ID}'
+        )
 
 
 def get_api_answer(timestamp):
@@ -144,7 +161,7 @@ def main():
         logging.critical(error_message)
         sys.exit(error_message)
 
-    bot = Bot(token=TELEGRAM_TOKEN)
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
     current_report = None

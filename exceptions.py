@@ -1,10 +1,16 @@
-class APIStatusCodeError(Exception):
+class StatusError(Exception):
+    """Ошибка статуса домашней работы."""
+
     pass
 
 
-class StatusError(Exception):
+class APIStatusCodeError(Exception):
+    """Ошибка при запросе к API."""
+
     pass
 
 
 class SendMessageError(Exception):
+    """Ошибка отправки сообщения."""
+
     pass
