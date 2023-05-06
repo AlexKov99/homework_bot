@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -5,11 +6,9 @@ import time
 from logging.handlers import RotatingFileHandler
 from http import HTTPStatus
 
-
 import requests
 import telegram
 from dotenv import load_dotenv
-
 
 from exceptions import (
     APIStatusCodeError,
@@ -79,28 +78,22 @@ def send_message(bot, message):
 
 def get_api_answer(timestamp):
     """Делает запрос к API и возвращает ответ."""
-    timestamp = timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
-        homework_statuses = requests.get(
+        response = requests.get(
             ENDPOINT,
             headers=HEADERS,
             params=params
         )
-    except Exception as error:
-        message = f'Эндпоинт {ENDPOINT} недоступен: {error}'
-        logger.error(message)
-        raise APIStatusCodeError(message)
-    if homework_statuses.status_code != HTTPStatus.OK:
-        message = f'Код ответа API: {homework_statuses.status_code}'
-        logger.error(message)
-        raise APIStatusCodeError(message)
-    try:
-        return homework_statuses.json()
-    except Exception as error:
-        message = f'Ошибка преобразования в формат json: {error}'
-        logger.error(message)
-        raise APIStatusCodeError(message)
+        if response.status_code != HTTPStatus.OK:
+            message = 'Сервер домашки не вернул статус OK.'
+            raise requests.exceptions.HTTPError(message)
+        homework_valid_json = response.json()
+    except requests.exceptions.RequestException as e:
+        raise APIStatusCodeError(f'Ошибка API {e}')
+    except json.JSONDecodeError as e:
+        raise APIStatusCodeError(f'Ошибка json {e}')
+    return homework_valid_json
 
 
 def check_response(response):
@@ -172,7 +165,7 @@ def main():
             response = get_api_answer(current_timestamp)
             current_timestamp = response['current_date']
             homeworks = check_response(response)
-            homework = homeworks[0]
+            homework = homeworks[0] or []
             current_report = send_message(bot, parse_status(homework))
 
             if current_report == prev_report:
