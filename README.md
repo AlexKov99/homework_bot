@@ -34,7 +34,6 @@ source venv/Scripts/activate
 python3 -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-Зарегистрировать чат-бота в Телеграм:
 ```bash
 pip install -r requirements.txt
 ```
