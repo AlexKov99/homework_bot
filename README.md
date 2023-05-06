@@ -35,9 +35,8 @@ python3 -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 ```bash
-pip install -r requirements.txt
-```
 Создать в корневой директории файл .env для хранения переменных окружения
+```
 ```bash
 export PRACTICUM_TOKEN=<PRACTICUM_TOKEN>
 export TELEGRAM_TOKEN=<TELEGRAM_TOKEN>
