@@ -34,12 +34,6 @@ source venv/Scripts/activate
 python3 -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-Выполнить миграции на уровне проекта:
-```bash
-cd yatube
-python3 manage.py makemigrations
-python3 manage.py migrate
-```
 Зарегистрировать чат-бота в Телеграм:
 ```bash
 pip install -r requirements.txt
