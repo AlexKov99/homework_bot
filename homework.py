@@ -146,7 +146,6 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    message_list = []
     if not check_tokens():
         error_message = (
             'Отсутствуют обязательные переменные окружения: '
@@ -158,18 +157,23 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
+    current_report = None
+    prev_report = current_report
+
     while True:
         try:
             response = get_api_answer(current_timestamp)
+            current_timestamp = response['current_date']
             homeworks = check_response(response)
-            homework = homeworks[0]
-            message = parse_status(homework)
-            if message in message_list or message == []:
-                logger.debug('Новые статусы отсутствуют')
+            if homeworks != []:
+                homework = homeworks[0]
             else:
-                message_list.append(message)
-                send_message(bot, message)
-            current_timestamp = int(time.time())
+                logger.debug('Список статусов пустой')
+            current_report = send_message(bot, parse_status(homework))
+            if current_report == prev_report:
+                logger.debug(
+                    'Нет обновлений статуса домашней работы'
+                )
         except SendMessageError as error:
             logger.error(error)
         except Exception as error:
